@@ -1,0 +1,41 @@
+trigger:
+- master
+
+pool:
+  vmImage: windows-latest
+
+variables:
+- group: SonarCloud
+
+steps:
+
+- task: UseDotNet@2
+  displayName: 'Use .NET SDK'
+  inputs:
+    packageType: sdk
+    version: 5.0.103
+
+- task: SonarCloudPrepare@1
+  displayName: 'Prepare SonarCloud analysis'
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
+  inputs:
+    SonarCloud: 'fernandreu-SonarCloud'
+    organization: '$(SonarOrganization)'
+    scannerMode: 'MSBuild'
+    projectKey: '$(SonarProjectKey)'
+    projectName: '$(SonarProjectName)'
+    projectVersion: '$(Build.BuildNumber)'
+    extraProperties: |
+      sonar.exclusions=**/*.CommandGenerator.cs
+      sonar.cs.vstest.reportsPaths=$(Agent.TempDirectory)/*.trx
+      sonar.cs.opencover.reportsPaths=$(Build.SourcesDirectory)/TestResults/CodeCoverage/coverage.${{ parameters.targetFramework }}.opencover.xml
+
+- task: DotNetCoreCLI@2
+  displayName: 'Build solution'
+  inputs:
+    command: build
+    configuration: Release
+
+- task: SonarCloudAnalyze@1
+  displayName: 'Run SonarCloud code analysis'
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
